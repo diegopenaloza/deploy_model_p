@@ -8,16 +8,21 @@ import re
 import json
 import pickle
 import warnings
+import requests
 import importlib
 import numpy as np
 import pandas as pd
 import requests, zipfile, io
 warnings.filterwarnings('ignore')
 from xgboost import plot_importance 
+import datetime
+import locale
+from datetime import date
+locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
 # # Ubicación json 
 
-# Accedemos a la base de datos de la que se quiere optener las nuevas predicciones
+# Accedemos a la base de datos de la que se quiere optener las nuevas predicciones (Si el json se ecuntra descargado, si no se da ninguna ruta se optendra la predicción del dia )
 path_1="../Data_Json/Raw-15-11-2022-month/releases_2022_noviembre.json"
 
 # # Cargamos el Modelo
@@ -102,17 +107,26 @@ def cer_39(sd,b):
     return len(out_time)
 
 
-def trasf_data(path=False,df=False): 
+def trasf_data(path="Today",df=False): 
     """
     Genera las variables necesarias para utilizar en el modelo
     return: DataFrame 
     """
-    if path!= False:
+    if path!= "Today":
         with open(path,'r', encoding="utf8") as f:
             data = json.loads(f.read())
+    elif path=="Today":
+        current_month_n=date.today().month
+        urljson=f'https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/download?type=json&year=2022&month={current_month_n}&method=all'
+        urlj=urljson
+        rj= requests.get(urlj)
+        zj = zipfile.ZipFile(io.BytesIO(rj.content))
+        name_json=zj.namelist()[0]
+        data = json.load(zj.open(name_json))
         # data = json.load(zj.open(path))
-        df = pd.json_normalize(data, record_path =['releases'])
-        df=df[df['tender.procurementMethodDetails']=='Subasta Inversa Electrónica']
+    df = pd.json_normalize(data, record_path =['releases'])
+    display(df
+    df=df[df['tender.procurementMethodDetails']=='Subasta Inversa Electrónica']
     
     for i in df.filter(regex='Date|date', axis=1).columns:
         df[i] = pd.to_datetime(df[i])
@@ -133,7 +147,7 @@ def trasf_data(path=False,df=False):
     return df
 
 
-def predict_df(path=False,df=False,model=False,ocid=False,scrap=False):
+def predict_df(path="Today",df=False,model=False,ocid=False,scrap=False):
     """
     Transforma el archivo json, aplica el modelo y seleciona las variables relebante 
     return : Dataframe 
@@ -171,7 +185,7 @@ def predict_df(path=False,df=False,model=False,ocid=False,scrap=False):
         return test_Ndata
 
 
-df_selec=predict_df(path=path_1,model=xgb_model,ocid=False,scrap=False)
+df_selec=predict_df(model=xgb_model,ocid=False,scrap=False)
 
 print(df_selec)
 
@@ -197,9 +211,8 @@ def search_code(df,code):
     return find
 
 
-
 print("Codigo de ejemplo,:SIE-GADMSFP-15-2022 "+"\nSe buscar en la base de datos que ya esta actualida con las predicciones")
-code_search="SIE-GADMSFP-15-2022"
+code_search="SIE-DPEG-03-2022"
 fin_df=search_code(df=df,code=code_search)
 
 print(fin_df)
